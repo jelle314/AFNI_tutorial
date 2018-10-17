@@ -1,0 +1,5 @@
+#!/bin/tcsh
+
+afni_proc.py -subj_id motionCorrect \
+	-dsets EPI/*.nii	\
+	-blocks despike volreg
