@@ -1,8 +1,8 @@
 #! /bin/bash
 
-export AFNI_TOOLBOXDIR=/home/jelle/Documents/Projects/AFNI_demo/Software/analysisAfni
+export AFNI_TOOLBOXDIR=/home/jelle/Documents/Projects/AFNI_demo/Scripts/analysisAfni_light
 
-PATH=$PATH:/home/jelle/Documents/Projects/AFNI_demo/Software/analysisAfni
+PATH=$PATH:/home/jelle/Documents/Projects/AFNI_demo/Scripts/analysisAfni_light
 PATH=$PATH:$AFNI_TOOLBOXDIR/surfaces
 PATH=$PATH:$AFNI_TOOLBOXDIR/coregistration
 PATH=$PATH:$AFNI_TOOLBOXDIR/motionCorrectAnatomies

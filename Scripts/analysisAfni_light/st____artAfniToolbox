@@ -1,0 +1,25 @@
+#! /bin/bash
+
+export AFNI_TOOLBOXDIR=/home/fracasso/analysisAfni
+
+PATH=$PATH:/home/fracasso/analysisAfni
+PATH=$PATH:$AFNI_TOOLBOXDIR/surfaces
+PATH=$PATH:$AFNI_TOOLBOXDIR/coregistration
+PATH=$PATH:$AFNI_TOOLBOXDIR/motionCorrectAnatomies
+
+export AFNI_TOOLBOXDIRSURFACES=$AFNI_TOOLBOXDIR/surfaces
+export AFNI_TOOLBOXDIRCOREGISTRATION=$AFNI_TOOLBOXDIR/coregistration
+export AFNI_TOOLBOXDIRCOREGISTRATION=$AFNI_TOOLBOXDIR/motionCorrectAnatomies
+export AFNI_ENVIRON_WARNINGS=NO
+
+#export PATH=$PATH:/home/alessiofracasso/Dropbox/analysisAfni
+#alias preprocessingPd='./home/alessiofracasso/Dropbox/analysisAfni/preprocessingPd.sh'
+
+#export AFNITOOLSURFACESDIR=/home/alessiofracasso/Dropbox/analysisAfni/surfaces
+#echo $AFNITOOLDIR
+#echo $AFNITOOLSURFACESDIR
+
+#export PATH=$PATH:/home/alessiofracasso/programs/elastix_linux64_v4.8/bin
+#export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/alessiofracasso/programs/elastix_linux64_v4.8/bin/lib
+#export LD_LIBRARY_PATH=/home/alessiofracasso/programs/elastix_linux64_v4.8/lib:$LD_LIBRARY_PATH
+

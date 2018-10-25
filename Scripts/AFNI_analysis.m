@@ -17,7 +17,7 @@ clear all
 close all
 
 addpath(genpath('/home/jelle/Documents/Software/matFileAddOn')); %add the right toolboxes
-addpath(genpath('/usr/share/afni/matlab');
+addpath(genpath('/usr/share/afni/matlab'));
 
 % Convert PAR and REC files to .nii
 r2agui % or something else. 
@@ -26,7 +26,7 @@ r2agui % or something else.
 setupDirectories
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% 		anatomical data           	%%
+%%                  anatomical data           	%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% For MP2RAGE data
@@ -40,6 +40,7 @@ mp2rageB('MP2RAGE',100,1); %stem string, threshold (play around with this!), mov
 system('skullStrip01.sh MPRAGE PD res coregFlag'); % MPRAGE = name of T1 file, PD = name of PD file, 
 	% res = output resn (mm), coregFlag = 0 or 1: 0 for MP2RAGE data 
 	% (as T1 and PD are inherently coregistered), 1 for MPRAGE data
+system('skullStrip01.sh T1_uncorrected.nii PD.nii 1 1')
 
 %% Now segment the resulting anatomy. 
 % This can be done using e.g. mipav with the cbs tools plugin.
@@ -79,17 +80,17 @@ system(['3dcalc -a segmentation.nii.gz -b leftSeg.nii.gz -c rightSeg.nii.gz -exp
  	'within(b,3,3) )*3 + and( within(a,3,3), within(c,3,3) )*4 + within(a,0,0)*1 + within(a,1,1)*0'' -prefix segmentation_mrVista.nii.gz'])
  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% 		functional data		        %%
+%%                 functional data		        %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-system('motionCorrect.afni.sh')    %prepare motion correction. Expects EPIs in EPI/ directory 
+system('motionCorrect.afni.sh EPI/')    %prepare motion correction. Expects EPIs in EPI/ directory 
 system('tcsh -xef proc.motionCorrect |& tee output.proc.motionCorrect') %Run motion correction
-system('computeAmplitudeAnatomy.sh') %compute mean EPI over runs, same as inplane in mrVista 
+system('computeAmplitudeAnatomy.sh motionCorrect.results/ ./') %compute mean EPI over runs, same as inplane in mrVista 
 
 %% Compute mean timeseries from the volreg files in the motionCorrect.results directory
 % NB: for multiple conditions, make sure you have only the volreg files in motionCorrect.results directory
 % of 1 condition, otherwise they will all be averaged together.  
-system('computeMeanTs.sh')
+system('computeMeanTs.sh motionCorrect.results/ ./')
 
 % Now rename the meanTs.nii file if you have more than one condition, and rerun with the volreg files 
 % for the other condition in the motionCorrect.results directory. 
@@ -110,7 +111,7 @@ saveRmModelAsNifti % some fiddling in the code may be required to make the last 
 % To run in the volume view, continue with the following steps
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% 		co-registration		        %%
+%%              co-registration     	        %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% co-register the functional volume(s) to the anatomy
@@ -120,7 +121,7 @@ saveRmModelAsNifti % some fiddling in the code may be required to make the last 
 % run all this from the Coregistration directory, and keep checking using AFNI via the command line! 
 
 % Clip the anatomy:
-system('@clip_volume -anterior 120 -input anatomy.nii.gz -prefix anatomy_clip.nii.gz');
+system('@clip_volume -anterior -90 -input MPRAGE_ss.nii -prefix anatomy_clip.nii.gz');
 	% 120 and anterior are indicators for how much is clipped and which direction is left over
 	% the -input and -prefix inputs are what you want them to be.
 	% clipping at this resolution is optional, but improves visualisation speed for high-resolution data.
@@ -135,19 +136,19 @@ system('3dAutomask -apply_prefix amplitudeAnatomy_mask.nii.gz amplitudeAnatomy.n
 system('3dZeropad -A 20 -P 20 -S 20 -I 20 -prefix amplitudeAnatomy_mask_zp.nii.gz amplitudeAnatomy_mask.nii.gz');
 
 % Now align the centres of mass of the amplitudeAnatomy and anatomy, so they are in the same space
-system('@Align_Centers -base anatomy_clip.nii.gz -dset amplitudeAnatomy_mask_zp.nii.gz -cm );
+system('@Align_Centers -base anatomy_clip.nii.gz -dset amplitudeAnatomy_mask_zp.nii.gz -cm');
 
 % now use the Nudge datasets plugin in Afni to get a good start for the coregistration
 % nudge the EPI volume, get 3drotate command from 'print' 
 % e.g.: 
-system(['3drotate -quintic -clipit -rotate 0.00I 0.00R 0.00A -ashift 13.50S -6.00L 17.00P -prefix ' ...
+system(['3drotate -quintic -clipit -rotate 0.00I -29.00R 0.00A -ashift 16.37S 0.00L 29.01P -prefix ' ...
  'amplitudeAnatomy_mask_zp_shft_rot.nii.gz amplitudeAnatomy_mask_zp_shft.nii.gz']);
 
 % Get the rotation matrix out as a .1D file
-cat_matvec 'amplitudeAnatomy_mask_zp_shft_rot.nii.gz::ROTATE_MATVEC_000000' -I -ONELINE > rotateMat.1D
+system(['cat_matvec ''amplitudeAnatomy_mask_zp_shft_rot.nii.gz::ROTATE_MATVEC_000000'' -I -ONELINE > rotateMat.1D']); 
 
 % Now refine the co-registration automatically
-system(['align_epi_anat.py -anat anatomy_res_clip.nii.gz ' ...
+system(['align_epi_anat.py -anat anatomy_clip.nii.gz ' ...
 	'-epi amplitudeAnatomy_mask_zp_shft_rot.nii.gz ' ...
 	'-epi_base 0 ' ... %the how manieth volume is the amplitudeAnatomy (usually 0, as AFNI starts at 0).
 	'-epi2anat ' ...
@@ -161,7 +162,7 @@ system('cat_matvec -ONELINE amplitudeAnatomy_mask_zp_shft.1D rotateMat.1D amplit
 % Apply the combined co-registration to the amplitudeAnatomy in one resampling step. 
 % At the same time, this is a check to see whether the combination of the matrices worked. 
 % If not, play around with the order in the previous command. 
-system(['3dAllineate -master ampltidueAnatomy_mask_zp_shft_rot_al+orig ' ...
+system(['3dAllineate -master amplitudeAnatomy_mask_zp_shft_rot_al+orig ' ...
  '-source amplitudeAnatomy.nii ' ...
  '-1Dmatrix_apply combined.1D ' ...
  '-final wsinc5 ' ...
@@ -170,19 +171,19 @@ system(['3dAllineate -master ampltidueAnatomy_mask_zp_shft_rot_al+orig ' ...
 % NOW GO AND DOUBLE CHECK ALL THE STEPS!
 
 % Apply the coregistration matrix to each mean timeseries
-system(['3dAllineate -master ampltidueAnatomy_mask_zp_shft_rot_al+orig ' ...
+system(['3dAllineate -master ./Coregistration/amplitudeAnatomy_mask_zp_shft_rot_al+orig ' ...
  '-source meanTs.nii ' ... %replace with the meanTs file for a specific condition
- '-1Dmatrix_apply combined.1D ' ...
+ '-1Dmatrix_apply ./Coregistration/combined.1D ' ...
  '-final NN ' ... %final interpolation. change to desired way.
  '-prefix meanTs_Coreg.nii.gz']); 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% 		surface analysis	        %%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% The co-registered volumes can now be used in mrVista or AFNI (see below).
 %% load up rxAlign. The angulation is now perfect, but you will need to shift/flip it manually. 
 %% This is an unfortunate effect of mrVista not reading the .nii headers correctly.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%              surface analysis                %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% surface analysis in AFNI:
 % This bit assumes that you have done the segmentation using mipave and cbs tools.
@@ -191,7 +192,9 @@ system(['3dAllineate -master ampltidueAnatomy_mask_zp_shft_rot_al+orig ' ...
 % define boundaries
 system('defineBoundaries.sh anatomy/boundaries.nii.gz 1 2 1')
 
+% REMOVE?
 system('3dcalc -a boundariesThr.nii.gz -b Layering/rightHemi.nii.gz -expr ''a*step(b)'' -prefix boundariesThr_clip.nii.gz')
+
 system('rm boundariesThr.nii.gz')
 system('mv boundariesThr_clip.nii.gz boundariesThr.nii.gz')
 % check the number of boundaries with 3dinfo, number of time steps = num
@@ -212,7 +215,7 @@ afniSurface.sh anatomy.nii.gz
 % Grow the ROIs over all layers
 lst = dir('*.roi');
 for iN = 1:length(lst)
-    system(['surf2vol.sh ' lst(iN).name ' boundary03 anatomy_res_depth_box.nii.gz 100']) 
+    system(['surf2vol.sh ' lst(iN).name ' boundary03 depth_shft_box.nii.gz 100']) 
 end
 
 % Combine ROIs (examples)

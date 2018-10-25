@@ -2,7 +2,6 @@
 %% Author: Jelle van Dijk, j.a.vandijk@uu.nl
 %% Called functions/scripts by: Alessio Fracasso, Wietske van der Zwaag & Jelle van Dijk
 
-
 %Convert your data to .nii with your favourite software. check that it is correct.
 % Have separate 'EPI' and 'TOPUP' directory 
 % have all the anatomy and ROI data in a folder called 'anatomy' 
@@ -15,7 +14,7 @@ clear all
 close all
 
 addpath(genpath('/home/jelle/Documents/Software/matFileAddOn')); %add the right toolboxes
-addpath(genpath('/usr/share/afni/matlab');
+addpath(genpath('/usr/share/afni/matlab'));
 
 % Setup the correct directory structure for the rest of the analysis
 setupDirectories_highRes
@@ -32,7 +31,9 @@ setupDirectories_highRes
 % QWarp (higher is more strict)
 % keep the 1's. the 1-2-3-4 are the runs you want to use for the correction
 % from the EPIs (first numbers) and TOPUP (2nd set).
-system('. motionCorrect.afni.blip.sh EPI/ TOPUP/ 1 1 1-2-3-4-5-6 1-2-3-4-5-6 5 -1')
+system('motionCorrect.afni.blip.sh EPI/ TOPUP/ 1 1 1-2-3-4-5-6 1-2-3-4-5-6 5 -1')
+system('motionCorrect.afni.blip.sh EPI/ TOPUP/ 1 1 1-2 1-2 5 -1')
+
 
 %% motion correct and motion correct + top up the original EPI data
 % Last input is the EPI number used for the previous step. 
@@ -61,7 +62,7 @@ saveRmModelAsNifti % some fiddling in the code may be required to make the last 
 		% line up with the polar angle etc maps.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% 		co-registration		        %%
+%%                co-registration		        %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Co-registration here is slightly different, as we want to touch the timeseries data as little as possible.
@@ -83,7 +84,7 @@ cd Coregistration
 % More information on the wiki
 
 % Clip the anatomy
-system('@clip_volume -anterior 180 -input anatomy.nii.gz -prefix anatomy_clip.nii.gz');
+system('@clip_volume -anterior 140 -input anatomy.nii.gz -prefix anatomy_clip.nii.gz');
 	% 180 and anterior are indicators for how much is clipped and which direction is left over
 	% the -input and -prefix inputs are what you want them to be.
 
@@ -97,14 +98,14 @@ system('3dZeropad -A 20 -P 20 -S 20 -I 20 -prefix amplitudeAnatomy_mask_zp.nii.g
 % the inputs after -child are volumes that are shifted with the -dset volume. 
 % NB: the -base is now the amplitudeAnatomy! So we are moving the anatomy! 
 system(['@Align_Centers -base amplitudeAnatomy_mask_zp.nii.gz -dset anatomy_clip.nii.gz -cm ' ...
-	'-child boundaries.nii.gz depth.nii.gz V1_rh_5deg+orig V1_lh_5deg+orig V2_rh_5deg+orig ' ...
-	'V2_lh_5deg+orig V3_rh_5deg+orig V3_lh_5deg+orig']);
+	'-child boundaries.nii.gz depth.nii.gz V1_rh_5deg+orig V1_lh+orig V2_rh+orig ' ...
+	'V2_lh+orig V3_rh+orig V3_lh+orig']);
 
 % now use the Nudge datasets plugin in Afni to get a good start for the coregistration
 % nudge the EPI volume, get 3drotate command from 'print'
 % NB: we are moving the amplitudeAnatomy now! 
 % e.g.:  
-system(['3drotate -quintic -clipit -rotate -3.40I -3.01R 1.48A -ashift -6.57S 7.36L 6.06P ' ...
+system(['3drotate -quintic -clipit -rotate 0.00I 4.00R 0.00A -ashift 2.99S 4.00L 7.36P ' ...
 	'-prefix amplitudeAnatomy_mask_zp_rot.nii.gz amplitudeAnatomy_mask_zp.nii.gz']);
 
 % Get the rotation matrix out as a .1D file
@@ -117,7 +118,7 @@ system(['align_epi_anat.py -anat anatomy_clip_shft.nii.gz ' ...
 	'-epi2anat ' ...
 	'-cost lpc ' ... %cost function. see the help (in the command line) for more info
 	'-anat_has_skull no ' ...
-	'-epi_strip None' ...
+	'-epi_strip None ' ...
 	'-Allineate_opts -maxrot 5 -maxshf 5']);  %Allow a maximum shift and rotation of 5 mm. Can also use 3.
 
 % Refine further (might not be needed)
@@ -127,7 +128,7 @@ system(['align_epi_anat.py -anat anatomy_clip_shft.nii.gz ' ...
 	'-epi2anat ' ...
 	'-cost lpc ' ... %cost function. see the help (in the command line) for more info
 	'-anat_has_skull no ' ...
-	'-epi_strip None' ...
+	'-epi_strip None ' ...
 	'-Allineate_opts -maxrot 1 -maxshf 1']);  %Allow a maximum shift and rotation of 1 mm. Can also use 3.
 
 % Combine all transformation matrices into one.
@@ -151,25 +152,27 @@ system('3dresample -master anatomy_clip_shft_box.nii.gz -inset boundaries_shft.n
 system('3dresample -master anatomy_clip_shft_box.nii.gz -inset depth_shft.nii.gz -prefix depth_shft_box.nii.gz -rmode NN');
 
 % Resample the ROIs
-system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V1_lh_5deg_shft+orig -prefix V1_lh_5deg_shft_box.nii.gz -rmode NN');
-system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V1_rh_5deg_shft+orig -prefix V1_rh_5deg_shft_box.nii.gz -rmode NN');
-system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V2_lh_5deg_shft+orig -prefix V2_lh_5deg_shft_box.nii.gz -rmode NN');
-system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V2_rh_5deg_shft+orig -prefix V2_rh_5deg_shft_box.nii.gz -rmode NN');
-system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V3_lh_5deg_shft+orig -prefix V3_lh_5deg_shft_box.nii.gz -rmode NN');
-system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V3_rh_5deg_shft+orig -prefix V3_rh_5deg_shft_box.nii.gz -rmode NN');
+system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V1_lh_shft+orig -prefix V1_lh_shft_box.nii.gz -rmode NN');
+system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V1_rh_shft+orig -prefix V1_rh_shft_box.nii.gz -rmode NN');
+system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V2_lh_shft+orig -prefix V2_lh_shft_box.nii.gz -rmode NN');
+system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V2_rh_shft+orig -prefix V2_rh_shft_box.nii.gz -rmode NN');
+system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V3_lh_shft+orig -prefix V3_lh_shft_box.nii.gz -rmode NN');
+system('3dresample -master anatomy_clip_shft_box.nii.gz -inset V3_rh_shft+orig -prefix V3_rh_shft_box.nii.gz -rmode NN');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% 	apply warp field and co-registration	%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% If you have something else (e.g. a pRFModel.nii volume), don't forget to also apply the 3dNwarpApply step to it.  
 
 cd ..
 system('mkdir results')
 system('computeAmplitudeAnatomy.sh motionCorrectEpi/') %compute amplitude anatomy from motion corrected epi only (not top up)
 system('mv amplitudeAnatomy.nii results/') %move it into results/
 system('mv results/amplitudeAnatomy.nii results/amplitudeAnatomyMotionCorrEpi.nii') %rename it
-system('cp Coregistration/anatomy_res_clip_shft_box.nii.gz results/')
-system('cp Coregistration/anatomy_res_boundaries_shft_box.nii.gz results/')
-system('cp Coregistration/anatomy_res_depth_shft_box.nii.gz results/')
+system('cp Coregistration/anatomy_clip_shft_box.nii.gz results/')
+system('cp Coregistration/boundaries_shft_box.nii.gz results/')
+system('cp Coregistration/depth_shft_box.nii.gz results/')
 system('cp Coregistration/amplitudeAnatomy_mask_zp_rot_al_al+orig* results/')
 system('mv Coregistration/V*_*h_shft_box.nii.gz results/') 
 system('3dcopy results/amplitudeAnatomy_mask_zp_rot_al_al+orig results/masterVolume.nii.gz')
@@ -197,16 +200,16 @@ instr = ['3dNwarpApply -master results/masterVolume.nii.gz' ...
     ' -prefix results/meanTsCoreg.nii.gz' ];
 system( instr )
 
-instr = [ '3dresample -master results/anatomy_res_clip_shft_box.nii.gz ' ...
+instr = [ '3dresample -master results/anatomy_clip_shft_box.nii.gz ' ...
     '-inset results/meanTsCoreg.nii.gz -prefix results/meanTsCoreg_box.nii.gz -rmode NN' ];
 system( instr )
  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% 		surface analysis	        %%
+%%                  surface analysis	        %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% build surfaces
-system('defineBoundaries.sh results/anatomy_res_boundaries_shft_box.nii.gz 1 2 1')
+system('defineBoundaries.sh results/boundaries_shft_box.nii.gz 1 2 1')
 system('mv boundariesThr.nii.gz results/')
 cd results/
 
@@ -214,7 +217,7 @@ system('generateSurfaces.sh 6 4 1200 3') %the 1200 is the inflation. Lower numbe
 
 %% Run from terminal to avoid unexpected behaviour! 
 % this will give you a 3d inflated view of your scan. 
-afniSurface.sh anatomy_res_clip_shft_box.nii.gz 
+afniSurface.sh anatomy_clip_shft_box.nii.gz 
 
 %% For ROI definition etc, see the AFNI_analysis.m file under 'surface analysis'.
 
